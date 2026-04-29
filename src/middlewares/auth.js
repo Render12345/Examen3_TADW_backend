@@ -24,7 +24,12 @@ const verifyToken = (req, res, next) => {
       return res.status(401).json({ message: 'Token expirado' });
     }
 
-    req.user = decoded; // { numero_control, email, ... }
+    // El SII usa "sub" para el número de control
+    req.user = {
+      ...decoded,
+      numero_control: decoded.sub,
+    };
+
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Token inválido' });
