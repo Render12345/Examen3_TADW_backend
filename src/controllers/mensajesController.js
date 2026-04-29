@@ -1,16 +1,26 @@
 // src/controllers/mensajesController.js
 import supabase from '../config/db.js';
 
-/**
- * GET /api/movil/estudiante/mensajes/:conversacion_id
- * Historial de mensajes de una conversación del alumno autenticado.
- */
+const SII_BASE = 'https://sii.celaya.tecnm.mx/api';
+
+// Obtiene el perfil del alumno desde el SII usando su token
+const getPerfilSII = async (token) => {
+  const res = await fetch(`${SII_BASE}/movil/estudiante`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('No se pudo obtener el perfil del SII');
+  const json = await res.json();
+  return json.data; // { numero_control, persona, email, ... }
+};
+
 export const getHistorialMensajes = async (req, res) => {
   const { conversacion_id } = req.params;
-  const numero_control = req.user.numero_control;
+  const token = req.headers['authorization'].split(' ')[1];
 
   try {
-    // Verificar que la conversación pertenece al alumno
+    const perfil = await getPerfilSII(token);
+    const numero_control = perfil.numero_control;
+
     const { data: conv, error: convError } = await supabase
       .from('conversaciones')
       .select('id')
@@ -22,7 +32,6 @@ export const getHistorialMensajes = async (req, res) => {
       return res.status(403).json({ message: 'No tienes acceso a esta conversación' });
     }
 
-    // Traer mensajes ordenados
     const { data: mensajes, error: mensajesError } = await supabase
       .from('mensajes')
       .select('id, sender_type, content, created_at')
@@ -31,7 +40,6 @@ export const getHistorialMensajes = async (req, res) => {
 
     if (mensajesError) throw mensajesError;
 
-    // Formatear hora a 12h estilo Mexico
     const resultado = mensajes.map((m) => ({
       id: m.id,
       sender_type: m.sender_type,
@@ -51,14 +59,9 @@ export const getHistorialMensajes = async (req, res) => {
   }
 };
 
-/**
- * POST /api/movil/estudiante/mensajes/:conversacion_id
- * Envía un mensaje del alumno en una conversación.
- * Body: { texto }
- */
 export const enviarMensaje = async (req, res) => {
   const { conversacion_id } = req.params;
-  const numero_control = req.user.numero_control;
+  const token = req.headers['authorization'].split(' ')[1];
   const { texto } = req.body;
 
   if (!texto || texto.trim() === '') {
@@ -66,7 +69,9 @@ export const enviarMensaje = async (req, res) => {
   }
 
   try {
-    // Verificar que la conversación pertenece al alumno
+    const perfil = await getPerfilSII(token);
+    const numero_control = perfil.numero_control;
+
     const { data: conv, error: convError } = await supabase
       .from('conversaciones')
       .select('id')
@@ -78,7 +83,6 @@ export const enviarMensaje = async (req, res) => {
       return res.status(403).json({ message: 'No tienes acceso a esta conversación' });
     }
 
-    // Insertar el mensaje
     const { data: nuevo, error: insertError } = await supabase
       .from('mensajes')
       .insert({
@@ -108,13 +112,8 @@ export const enviarMensaje = async (req, res) => {
   }
 };
 
-/**
- * POST /api/movil/estudiante/conversaciones
- * Obtiene o crea la conversación entre el alumno y un maestro.
- * Body: { maestro_id }
- */
 export const obtenerOCrearConversacion = async (req, res) => {
-  const numero_control = req.user.numero_control;
+  const token = req.headers['authorization'].split(' ')[1];
   const { maestro_id } = req.body;
 
   if (!maestro_id) {
@@ -122,7 +121,22 @@ export const obtenerOCrearConversacion = async (req, res) => {
   }
 
   try {
-    // Validar que el maestro existe
+    // 1. Obtener datos reales del alumno desde el SII
+    const perfil = await getPerfilSII(token);
+    const numero_control = perfil.numero_control;
+    const nombre = perfil.persona;
+
+    // 2. Upsert del estudiante en tu tabla
+    const { error: upsertError } = await supabase
+      .from('estudiantes')
+      .upsert(
+        { numero_control, nombre },
+        { onConflict: 'numero_control' }
+      );
+
+    if (upsertError) throw upsertError;
+
+    // 3. Validar que el maestro existe
     const { data: maestro, error: maestroError } = await supabase
       .from('maestros')
       .select('id')
@@ -133,7 +147,7 @@ export const obtenerOCrearConversacion = async (req, res) => {
       return res.status(404).json({ message: 'Maestro no encontrado' });
     }
 
-    // Buscar conversación existente
+    // 4. Buscar conversación existente
     const { data: existente } = await supabase
       .from('conversaciones')
       .select('id')
@@ -145,7 +159,7 @@ export const obtenerOCrearConversacion = async (req, res) => {
       return res.status(200).json({ conversacion_id: existente.id });
     }
 
-    // Crear nueva conversación
+    // 5. Crear nueva conversación
     const { data: nueva, error: insertError } = await supabase
       .from('conversaciones')
       .insert({ numero_control, maestro_id })
