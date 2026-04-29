@@ -87,7 +87,7 @@ export const enviarMensaje = async (req, res) => {
       .from('mensajes')
       .insert({
         conversation_id: conversacion_id,
-        sender_type: 'Alumno',
+        sender_type: 'estudiante',
         content: texto.trim(),
       })
       .select('id, sender_type, content, created_at')
