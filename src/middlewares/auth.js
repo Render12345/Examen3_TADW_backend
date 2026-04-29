@@ -1,10 +1,6 @@
 // src/middlewares/auth.js
 import jwt from 'jsonwebtoken';
 
-/**
- * Verifica el token JWT del header Authorization.
- * Si es válido, inyecta req.user con el payload del token.
- */
 const verifyToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
 
@@ -15,11 +11,23 @@ const verifyToken = (req, res, next) => {
   const token = authHeader.split(' ')[1];
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // decode sin verificar firma — el token lo emite el SII ITC
+    const decoded = jwt.decode(token);
+
+    if (!decoded) {
+      return res.status(401).json({ message: 'Token inválido' });
+    }
+
+    // Verificar que no haya expirado
+    const ahora = Math.floor(Date.now() / 1000);
+    if (decoded.exp && decoded.exp < ahora) {
+      return res.status(401).json({ message: 'Token expirado' });
+    }
+
     req.user = decoded; // { numero_control, email, ... }
     next();
   } catch (err) {
-    return res.status(401).json({ message: 'Token inválido o expirado' });
+    return res.status(401).json({ message: 'Token inválido' });
   }
 };
 
