@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mensajesRouter from './routes/mensajes.js';
+import siiRouter from "./routes/sii.js";
 
 dotenv.config();
 
@@ -19,6 +20,7 @@ app.use(express.json());
 // ──────────────────────────────────────────────
 
 // Rutas de mensajes (prefijo que coincide con el frontend)
+app.use("/api", siiRouter);
 app.use('/api/movil/estudiante', mensajesRouter);
 
 // ──────────────────────────────────────────────
