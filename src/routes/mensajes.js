@@ -6,30 +6,22 @@ import {
   enviarMensaje,
   obtenerOCrearConversacion,
 } from '../controllers/mensajesController.js';
+import { getMaestroDeGrupo } from '../controllers/gruposController.js';
 
 const router = Router();
 
-// Todas las rutas requieren token JWT
 router.use(verifyToken);
 
-/**
- * POST /api/movil/estudiante/conversaciones
- * Crea o recupera la conversación del alumno con el maestro de su grupo
- * Body: { maestro_id }
- */
+// Obtener maestro_id de un grupo
+router.get('/grupos/:id_grupo/maestro', getMaestroDeGrupo);
+
+// Obtener o crear conversación
 router.post('/conversaciones', obtenerOCrearConversacion);
 
-/**
- * GET /api/movil/estudiante/mensajes/:conversacion_id
- * Trae el historial de mensajes de una conversación
- */
+// Historial de mensajes
 router.get('/mensajes/:conversacion_id', getHistorialMensajes);
 
-/**
- * POST /api/movil/estudiante/mensajes/:conversacion_id
- * Envía un mensaje del alumno en una conversación
- * Body: { texto }
- */
+// Enviar mensaje
 router.post('/mensajes/:conversacion_id', enviarMensaje);
 
 export default router;
